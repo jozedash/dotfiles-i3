@@ -11,7 +11,7 @@ git clone https://github.com/jozedash/dotfiles-i3 ~/dotfiles-i3
 ~/dotfiles-i3/install.sh
 ```
 
-The script installs the packages and JetBrainsMono Nerd Font, then symlinks `i3`, `polybar`, `picom`, `rofi` and `dunst` into `~/.config`. Any existing configs are moved to `*.bak_<date>`. Choose **i3** at the login screen afterwards. Cinnamon stays installed and selectable.
+The script installs the packages and JetBrainsMono Nerd Font, then symlinks `i3`, `polybar`, `picom`, `rofi` and `dunst` into `~/.config`. Any existing configs are moved to `*.bak_<date>`. It also builds [i3lock-color](https://github.com/Raymo111/i3lock-color) into `/usr/local` with `install-i3lock-color.sh`, because Mint doesn't package it. Stock i3lock still works, but the lock screen loses its live clock and coloured indicator. Choose **i3** at the login screen afterwards. Cinnamon stays installed and selectable.
 
 | Component | Replaces (Hyprland setup) |
 |---|---|
@@ -20,7 +20,7 @@ The script installs the packages and JetBrainsMono Nerd Font, then symlinks `i3`
 | Polybar | Waybar |
 | rofi | Wofi |
 | dunst | swaync |
-| i3lock + xss-lock | hyprlock + hypridle |
+| i3lock-color + xss-lock | hyprlock + hypridle |
 
 ## Keybindings
 

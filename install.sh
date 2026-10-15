@@ -38,6 +38,8 @@ if ! ls "$HOME"/Pictures/wallpaper.* >/dev/null 2>&1; then
     cp "$repo/Pictures/wallpaper.jpg" "$HOME/Pictures/wallpaper.jpg"
 fi
 
+"$repo/install-i3lock-color.sh"
+
 if pgrep -x i3 >/dev/null; then
     i3-msg restart
 fi

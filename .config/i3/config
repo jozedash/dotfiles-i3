@@ -18,6 +18,8 @@ exec --no-startup-id dex --autostart --environment i3
 exec --no-startup-id /usr/libexec/csd-xsettings
 exec --no-startup-id /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1
 exec --no-startup-id gnome-keyring-daemon --start --components=secrets,ssh
+# hypridle timings: lock at 6 min, screen off at 7 min.
+exec --no-startup-id xset s 360 360 dpms 0 0 420
 exec --no-startup-id xss-lock --transfer-sleep-lock -- ~/.config/i3/scripts/lock.sh --nofork
 exec --no-startup-id dunst
 exec --no-startup-id ~/.config/i3/scripts/touchpad.sh
