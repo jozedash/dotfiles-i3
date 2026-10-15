@@ -1,0 +1,31 @@
+[global]
+    font = JetBrainsMono Nerd Font 10
+    origin = top-right
+    offset = (10, 45)
+    width = 350
+    corner_radius = 10
+    frame_width = 2
+    frame_color = "#ff00ff"
+    separator_color = frame
+    gap_size = 5
+    padding = 10
+    horizontal_padding = 12
+    icon_position = left
+    max_icon_size = 48
+
+[urgency_low]
+    background = "#3f3f3fdd"
+    foreground = "#d8dee9"
+    frame_color = "#595959"
+    timeout = 5
+
+[urgency_normal]
+    background = "#3f3f3fdd"
+    foreground = "#d8dee9"
+    timeout = 8
+
+[urgency_critical]
+    background = "#3f3f3fdd"
+    foreground = "#d8dee9"
+    frame_color = "#f53c3c"
+    timeout = 0

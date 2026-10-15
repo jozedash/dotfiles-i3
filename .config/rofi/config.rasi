@@ -1,0 +1,54 @@
+/* Port of jozedash/dotfiles wofi config + style.css */
+configuration {
+  modi: "drun,run,window";
+  show-icons: true;
+  icon-theme: "Mint-Y";
+  drun-display-format: "{name}";
+  display-drun: "";
+  case-sensitive: false;
+  font: "JetBrainsMono Nerd Font 11";
+}
+
+* {
+  fg: rgb(216, 222, 233);
+  bg: rgba(89, 89, 89, 50%);
+  bg-inner: rgba(63, 63, 63, 80%);
+  accent: rgba(255, 0, 255, 100%);
+  background-color: transparent;
+  text-color: @fg;
+}
+
+window {
+  width: 800px;
+  location: center;
+  border: 2px;
+  border-color: @accent;
+  border-radius: 10px;
+  background-color: @bg;
+  padding: 5px;
+}
+
+mainbox { children: [inputbar, listview]; spacing: 5px; }
+
+inputbar {
+  background-color: @bg-inner;
+  padding: 8px;
+  border-radius: 5px;
+  children: [entry];
+}
+
+entry { placeholder: "Search..."; placeholder-color: rgba(216, 222, 233, 60%); }
+
+listview {
+  background-color: @bg-inner;
+  lines: 8;
+  dynamic: true;
+  scrollbar: false;
+  padding: 5px;
+  border-radius: 5px;
+}
+
+element { padding: 5px; spacing: 10px; border-radius: 5px; border: 1px; border-color: transparent; }
+element-icon { size: 25px; }
+element-text { vertical-align: 0.5; }
+element selected { background-color: rgba(63, 63, 63, 70%); border-color: @fg; }
