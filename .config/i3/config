@@ -9,9 +9,10 @@ set $menu exec --no-startup-id rofi -show drun
 set $lock exec --no-startup-id ~/.config/i3/scripts/lock.sh
 set $code exec --no-startup-id code
 set $email exec --no-startup-id thunderbird
-set $browser exec --no-startup-id firefox
+set $browser exec --no-startup-id brave-browser
 
 #region Autostart
+exec --no-startup-id xrdb -merge ~/.Xresources
 # dex runs /etc/xdg/autostart entries (nm-applet, blueman, touchegg, ...).
 exec --no-startup-id dex --autostart --environment i3
 # Cinnamon normally provides these; without them GTK theming and sudo/polkit prompts break.
