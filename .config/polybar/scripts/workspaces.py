@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Waybar-style workspaces for Polybar: 1-6 always shown, plus any higher ones in use."""
+import configparser
 import os
 import sys
+from pathlib import Path
 
 try:
     from i3ipc import Connection, Event
@@ -10,7 +12,12 @@ except ImportError:
 
 PERSISTENT = range(1, 7)
 ACTIVE, DEFAULT = "", ""
-ACCENT, URGENT = "#ff00ff", "#ff0000"
+# The theme's colours (colors.ini is written by ~/.config/theme/theme-apply);
+# theme changes restart Polybar, which restarts this script.
+COLOURS = configparser.ConfigParser()
+COLOURS.read(Path.home() / ".config/polybar/colors.ini")
+ACCENT = COLOURS.get("colors", "primary", fallback="#ff00ff")
+URGENT = COLOURS.get("colors", "alert", fallback="#ff0000")
 MONITOR = os.environ.get("MONITOR", "")
 
 

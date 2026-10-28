@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# Run weekly by apt-download.timer, as root. Downloads pending updates into apt's
+# cache without installing them, so Super+U (or Mint's Update Manager) only has
+# to install. The user's apt-updates-notify.path then sends a notification.
+#
+# State in /var/lib/apt-download:
+#   pending  one line per update, "package installed -> new" ("(none)" for a new dependency)
+#   error    why the last run failed, empty after a successful one
+
+STATE=/var/lib/apt-download
+mkdir -p "$STATE"
+chmod 755 "$STATE"   # the user's notifier and Polybar read it
+
+ERROR=$(mktemp)
+trap 'rm -f "$ERROR"' EXIT
+
+# Mint's Update Manager may be holding apt's lock: wait for it rather than fail.
+# --error-on=any: a repository that fails to refresh is an error, not a warning.
+LOCK=(-o DPkg::Lock::Timeout=600)
+if apt-get "${LOCK[@]}" -q update --error-on=any > /dev/null 2> "$ERROR" &&
+    apt-get "${LOCK[@]}" -q -y --download-only dist-upgrade > /dev/null 2>> "$ERROR"; then
+    # Simulation lines: "Inst pkg [old] (new suite [arch])", or without [old] when new
+    apt-get -s dist-upgrade |
+        sed -nE 's/^Inst (\S+) \[(\S+)\] \((\S+) .*/\1 \2 -> \3/p; s/^Inst (\S+) \((\S+) .*/\1 (none) -> \2/p' \
+        > "$STATE/pending"
+    : > "$ERROR"
+    # Debs that can no longer be downloaded (superseded) aren't worth keeping
+    apt-get -q autoclean > /dev/null
+fi
+cp "$ERROR" "$STATE/error"
+chmod 644 "$STATE/pending" "$STATE/error" 2>/dev/null

@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+#
+# Run weekly by security-scan.timer, as root, alongside apt-download. Checks the
+# system for problems and writes one line per finding; the user's
+# security-scan-notify.path then sends a notification about any that are new.
+#
+# Checks:
+#   firewall   ufw isn't active
+#   port       something listens on a non-loopback address
+#   security   installed package with a security update waiting (from apt's
+#              package lists, which apt-download refreshes weekly)
+#   altered    package file whose contents differ from the package (debsums)
+#   unowned    executable or systemd unit that no package installed (files
+#              install.sh copied from the dotfiles repo, listed in
+#              /etc/security-scan/expected, don't count)
+#   foreign    package no repository has (installed from a .deb, or dropped from
+#              its repository): no updates
+#   rkhunter   rkhunter warning
+#
+# A finding is only reported as new once; the next scan compares against this one.
+# To see it all again: cat /var/lib/security-scan/report
+#
+# State in /var/lib/security-scan:
+#   findings   every finding from the last scan, sorted
+#   new        findings that weren't in the previous scan, empty when none
+#   report     findings plus the full output of each check
+
+STATE=/var/lib/security-scan
+export LC_ALL=C   # sort and comm must agree on the order
+mkdir -p "$STATE"
+chmod 755 "$STATE"   # the user's notifier reads it
+
+FINDINGS=$(mktemp)
+REPORT=$(mktemp)
+RKH=$(mktemp)
+trap 'rm -f "$FINDINGS" "$REPORT" "$RKH"' EXIT
+
+# section <title>: start a section of the report
+section() { printf '\n=== %s\n' "$1" >> "$REPORT"; }
+
+section "Firewall"
+if ufw status | tee -a "$REPORT" | grep -q '^Status: active'; then
+    :
+else
+    echo "firewall: ufw is not active (sudo ufw enable && sudo systemctl enable ufw)" >> "$FINDINGS"
+fi
+
+section "Listening on the network"
+# Local address is column 5; loopback and the DHCPv6 client (546) are expected
+ss -tulnH | tee -a "$REPORT" |
+    awk '$5 !~ /^(127\.|\[::1\]|\[::ffff:127\.)/ && $5 !~ /:546$/ {print "port: " $1 " " $5}' |
+    sort -u >> "$FINDINGS"
+
+section "Security updates waiting (apt)"
+# Ubuntu publishes no CVE feed apt can query offline, so a pending update from a
+# -security pocket stands in: it's a known vulnerability with a fix
+apt-get -s dist-upgrade 2>&1 | grep '^Inst .*-security' | tee -a "$REPORT" |
+    sed -nE 's/^Inst (\S+) .*/security: \1/p' >> "$FINDINGS"
+
+section "Altered package files (debsums)"
+# Config files are left out (debsums' default): editing those is expected
+if command -v debsums > /dev/null; then
+    debsums -s 2>&1 | grep -E '^debsums: (changed|missing) file' |
+        tee -a "$REPORT" | sed 's/^debsums: /altered: /' >> "$FINDINGS"
+else
+    echo "debsums isn't installed: sudo apt install debsums" | tee -a "$REPORT"
+fi
+
+section "Files no package owns"
+# Symlinks are skipped: enabling a unit creates them in /etc/systemd/system.
+# Packages may list /bin, /sbin and /lib paths, which merged /usr puts under /usr.
+comm -23 \
+    <(find /usr/bin /usr/local/bin /usr/lib/systemd/system /etc/systemd/system \
+        -maxdepth 1 -type f 2>/dev/null | sort) \
+    <({ cat /var/lib/dpkg/info/*.list | sed -E 's#^/(bin|sbin|lib)/#/usr/\1/#'
+        dpkg-divert --list | awk '{print $3; print $5}'
+        cat /etc/security-scan/expected 2>/dev/null; } | sort -u) |
+    tee -a "$REPORT" | sed 's/^/unowned: /' >> "$FINDINGS"
+
+section "Packages not from the repos"
+# "local" in apt's status: no configured repository has this version
+apt list --installed 2>/dev/null | grep ',local\]' | tee -a "$REPORT" |
+    sed -E 's#^([^/]+)/\S+ (\S+).*#foreign: \1 \2#' >> "$FINDINGS"
+
+section "rkhunter"
+# Its file properties check flags every upgraded file until 'rkhunter --propupd';
+# debsums above checks the same files against the packages instead
+rkhunter --check --sk --rwo --nocolors --disable properties > "$RKH" 2>&1
+cat "$RKH" >> "$REPORT"
+grep '^Warning:' "$RKH" | sed 's/^Warning: /rkhunter: /' >> "$FINDINGS"
+
+sort -u "$FINDINGS" -o "$FINDINGS"
+{ echo "Security scan $(date '+%F %T')"; echo; cat "$FINDINGS"; cat "$REPORT"; } > "$STATE/report"
+
+# Previous findings count as seen; the first scan reports everything
+touch "$STATE/findings"
+NEW=$(comm -13 "$STATE/findings" "$FINDINGS")
+cp "$FINDINGS" "$STATE/findings"
+chmod 644 "$STATE/report" "$STATE/findings"
+# Only touch new when it changes, each write triggers a notification
+if [ "$NEW" != "$(cat "$STATE/new" 2>/dev/null)" ]; then
+    printf '%s' "$NEW" > "$STATE/new"
+    chmod 644 "$STATE/new"
+fi

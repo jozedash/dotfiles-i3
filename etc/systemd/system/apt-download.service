@@ -1,0 +1,11 @@
+[Unit]
+Description=Download pending apt updates (without installing them)
+Documentation=file:///usr/local/bin/apt-download
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/apt-download
+Nice=19
+IOSchedulingClass=idle

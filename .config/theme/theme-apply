@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+"""Apply the theme: update the saved state from the flags, render every
+consumer's colours file from templates/, then tell running programs to reload.
+
+With no flags it re-renders from the saved state (install.sh does this).
+State: ~/.local/state/dotfiles-theme/state.json. Defaults: dark, magenta/purple.
+
+Adding a consumer: a template in templates/ using @name@ placeholders (names
+from theme.palette()), a line in TARGETS, and its reload command in RELOADS.
+"""
+
+import argparse
+import fcntl
+import hashlib
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import NamedTuple
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+sys.dont_write_bytecode = True  # no __pycache__ in the repo
+import theme  # noqa: E402
+
+CONFIG = Path.home() / ".config"
+FCITX5_THEME = Path.home() / ".local/share/fcitx5/themes/hypr"
+GTK_THEMES = Path.home() / ".local/share/themes"
+OUR_GTK_THEME = re.compile(r"Hypr-(dark|light)-[0-9a-f]{8}")
+LOCK = theme.STATE_FILE.with_name("lock")
+
+
+class Target(NamedTuple):
+    template: str
+    output: Path
+    append: Path = None  # file added after the rendered template
+    needs: Path = None   # skip unless this exists (default: output's directory)
+
+
+# A target is skipped when its config isn't linked on this machine. The fcitx5
+# theme is generated whole; its backgrounds are drawn as SVG but written as PNG
+# (a .png output of an SVG template is rasterised), because fcitx5 doesn't load
+# an SVG highlight.
+TARGETS = [
+    Target("i3-colors.conf.in", CONFIG / "i3/colors.conf"),
+    Target("lock-colors.sh.in", CONFIG / "i3/lock-colors.sh"),
+    Target("polybar-colors.ini.in", CONFIG / "polybar/colors.ini"),
+    Target("rofi-colors.rasi.in", CONFIG / "rofi/colors.rasi"),
+    Target("dunst-colors.conf.in", CONFIG / "dunst/dunstrc.d/colors.conf", needs=CONFIG / "dunst"),
+    Target("kitty-colors.conf.in", CONFIG / "kitty/colors.conf"),
+    # fastfetch isn't linked (it has no config of its own); it reads this on every run
+    Target("fastfetch.jsonc.in", CONFIG / "fastfetch/config.jsonc", needs=CONFIG),
+] + [
+    Target(f"fcitx5/{name}.in", FCITX5_THEME / name, needs=CONFIG / "fcitx5")
+    for name in ("theme.conf", "arrow.svg", "prev.svg", "next.svg", "radio.svg")
+] + [
+    Target(f"fcitx5/{name}.svg.in", FCITX5_THEME / f"{name}.png", needs=CONFIG / "fcitx5")
+    for name in ("panel", "highlight")
+] + [
+    # GTK itself is always there. The GTK3 theme comes from gtk3_theme.
+    Target("gtk/gtk3-settings.ini.in", CONFIG / "gtk-3.0/settings.ini", needs=CONFIG),
+    Target("css-vars.css.in", CONFIG / "gtk-4.0/gtk.css",
+           append=HERE / "templates/gtk/gtk4.css", needs=CONFIG),
+    Target("gtk/gtk4-settings.ini.in", CONFIG / "gtk-4.0/settings.ini", needs=CONFIG),
+]
+
+
+# (schema, key, value name). Cinnamon's xsettings daemon, which the i3 config
+# starts, serves its own schema to X11 GTK apps: changing it is what makes
+# running apps restyle. GNOME's schema and the XApp portal's colour scheme
+# reach libadwaita and portal apps (Firefox).
+GSETTINGS = [
+    ("org.cinnamon.desktop.interface", "gtk-theme", "gtk_theme"),
+    ("org.cinnamon.desktop.interface", "icon-theme", "icon_theme"),
+    ("org.gnome.desktop.interface", "gtk-theme", "gtk_theme"),
+    ("org.gnome.desktop.interface", "icon-theme", "icon_theme"),
+    ("org.gnome.desktop.interface", "color-scheme", "color_scheme"),
+    ("org.x.apps.portal", "color-scheme", "color_scheme"),
+]
+
+# (process name, command): run only while that process is running. Commands
+# can use @name@ placeholders like templates. rofi and i3lock read their
+# config on every launch, so they need nothing. A reload (not a restart) keeps
+# i3 from re-running exec_always and from moving focus off the theme popup.
+RELOADS = [
+    ("i3", ["i3-msg", "-q", "reload"]),
+    ("polybar", ["polybar-msg", "cmd", "restart"]),
+    ("dunst", [str(CONFIG / "dunst/reload.sh")]),
+    ("fcitx5", ["fcitx5-remote", "-r"]),
+    ("kitty", ["pkill", "-SIGUSR1", "-x", "kitty"]),  # every kitty re-reads its config
+    ("i3", [str(CONFIG / "i3/scripts/wallpaper.sh"), "@mode@"]),
+]
+
+# Tray apps that only read the icon theme at startup
+RESTART_TRAY_APPS = CONFIG / "i3/scripts/restart_tray_apps.sh"
+
+PLACEHOLDER = re.compile(r"@(\w+)@")
+
+
+def render(template, values):
+    text = (HERE / "templates" / template).read_text()
+
+    def sub(m):
+        if m.group(1) not in values:
+            sys.exit(f"theme-apply: templates/{template} uses unknown @{m.group(1)}@")
+        return values[m.group(1)]
+
+    return PLACEHOLDER.sub(sub, text)
+
+
+def write_if_changed(path, data):
+    try:
+        if (path.read_bytes() if isinstance(data, bytes) else path.read_text()) == data:
+            return
+    except OSError:
+        pass
+    theme.write_atomic(path, data)
+
+
+def rasterise(svg):
+    """SVG text -> PNG bytes, for programs that can't use SVG everywhere."""
+    return subprocess.run(["rsvg-convert", "--format", "png"], input=svg.encode(),
+                          capture_output=True, check=True).stdout
+
+
+# Adwaita 3.24 has ~175-185 accent-coloured values; far fewer means its colours
+# changed and the recolouring is only partial.
+MIN_ACCENTS = 50
+
+
+def warn(message):
+    """To stderr and, when there's a desktop, as a notification."""
+    print(f"theme-apply: {message}", file=sys.stderr)
+    if shutil.which("notify-send"):
+        subprocess.run(["notify-send", "-a", "Theme", "Theme", message], capture_output=True)
+
+
+def adwaita_css(name):
+    """Built-in GTK3 Adwaita's compiled CSS, from libgtk's resources."""
+    import gi
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gio, Gtk  # noqa: F401 (importing Gtk registers them)
+    return Gio.resources_lookup_data(f"/org/gtk/libgtk/theme/Adwaita/{name}", 0).get_data().decode()
+
+
+def gtk3_theme(values):
+    """Our GTK3 theme as (path, css): Adwaita recoloured, our colour
+    definitions, then templates/gtk/gtk3.css for what recolouring can't do.
+    Sets values["gtk_theme"], its name.
+
+    GTK3 only re-reads a theme when its name changes, so the name carries a
+    hash of the contents: any change (pair, mode, palette, gtk3.css) is a new
+    theme, and running apps restyle live.
+
+    If Adwaita can't be read or recoloured (a GTK update moved or changed it),
+    warn and fall back to importing plain Adwaita, so the rest of theme-apply
+    still runs and GTK apps keep our accents from gtk3.css."""
+    try:
+        adwaita, accents = theme.recolour_adwaita(adwaita_css(values["adwaita_css"]), values)
+        if accents < MIN_ACCENTS:
+            warn(f"GTK theme: only {accents} accent colours recoloured, Adwaita may have "
+                 "changed (see recolour_adwaita in ~/.config/theme/theme.py)")
+    except Exception as e:  # anything from gi, the resource lookup or the parsing
+        warn(f"GTK theme: couldn't recolour Adwaita ({e}); using plain Adwaita")
+        adwaita = f'@import url("resource:///org/gtk/libgtk/theme/Adwaita/{values["adwaita_css"]}");\n'
+    body = (adwaita + "\n" + render("gtk3-colors.css.in", values)
+            + "\n" + (HERE / "templates/gtk/gtk3.css").read_text())
+    digest = hashlib.sha256(body.encode()).hexdigest()[:8]
+    values["gtk_theme"] = f"Hypr-{values['mode']}-{digest}"
+    css = render("gtk/gtk3-header.css.in", values) + body
+    return GTK_THEMES / values["gtk_theme"] / "gtk-3.0/gtk.css", css
+
+
+def update_gsettings(values):
+    """Set the GSettings that differ, then delete our GTK themes that are no
+    longer in use. Done even with --no-reload: they're settings, not reloads.
+    Without a session bus (e.g. under sudo) setting fails; the themes
+    GSettings still name are then kept, so apps don't lose them.
+
+    Returns whether the icon theme changed."""
+    def get(schema, key):
+        return subprocess.run(["gsettings", "get", schema, key],
+                              capture_output=True, text=True).stdout.strip()
+
+    in_use = {values["gtk_theme"]}
+    icon_theme_changed = False
+    if shutil.which("gsettings"):
+        for schema, key, name in GSETTINGS:
+            if get(schema, key) != f"'{values[name]}'":
+                subprocess.run(["gsettings", "set", schema, key, values[name]], capture_output=True)
+                icon_theme_changed |= key == "icon-theme"
+        in_use |= {get(schema, key).strip("'") for schema, key, _ in GSETTINGS if key == "gtk-theme"}
+    if GTK_THEMES.is_dir():
+        for old in GTK_THEMES.iterdir():
+            if OUR_GTK_THEME.fullmatch(old.name) and old.name not in in_use:
+                shutil.rmtree(old)
+    return icon_theme_changed
+
+
+def reload(values):
+    for name, command in RELOADS:
+        if subprocess.run(["pgrep", "-x", name], capture_output=True).returncode != 0:
+            continue
+        command = [PLACEHOLDER.sub(lambda m: values[m.group(1)], arg) for arg in command]
+        if not shutil.which(command[0]):
+            continue
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=5)
+        except subprocess.TimeoutExpired:
+            warn(f"{' '.join(command)} timed out")
+            continue
+        if result.returncode != 0:
+            # Most likely the program's IPC changed in an update
+            warn(f"reloading {name} failed: {(result.stderr or result.stdout).strip()}")
+
+
+def update_state(args, state):
+    """Apply the flag (if any) to state. Returns an error message or None."""
+    current = state["pair"]
+    favourites = state["favourites"]
+    try:
+        if args.pair:
+            state["pair"] = theme.pair(*args.pair)
+        elif args.mode:
+            state["mode"] = args.mode
+        elif args.toggle_mode:
+            state["mode"] = "light" if state["mode"] == "dark" else "dark"
+        elif args.favourite:
+            if current in favourites:
+                return None
+            if len(favourites) >= theme.MAX_FAVOURITES:
+                return f"already {theme.MAX_FAVOURITES} favourites, unfavourite one first"
+            favourites.append(dict(current))
+        elif args.unfavourite is not None:
+            if len(args.unfavourite) not in (0, 2):
+                return "--unfavourite takes no colours (the current pair) or two"
+            target = theme.pair(*args.unfavourite) if args.unfavourite else current
+            if target in favourites:
+                favourites.remove(target)
+        elif args.cycle_favourite:
+            if not favourites:
+                return "no favourites to cycle through"
+            i = favourites.index(current) + 1 if current in favourites else 0
+            state["pair"] = dict(favourites[i % len(favourites)])
+    except ValueError as e:
+        return str(e)
+    return None
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument("--pair", nargs=2, metavar=("PRIMARY", "SECONDARY"),
+                        help="set the accent pair, e.g. --pair '#ff00ff' '#8800ff'")
+    action.add_argument("--mode", choices=sorted(theme.MODES))
+    action.add_argument("--toggle-mode", action="store_true")
+    action.add_argument("--favourite", action="store_true",
+                        help=f"add the current pair to the favourites (max {theme.MAX_FAVOURITES})")
+    action.add_argument("--unfavourite", nargs="*", metavar="COLOUR",
+                        help="remove a pair from the favourites (default: the current one)")
+    action.add_argument("--cycle-favourite", action="store_true",
+                        help="switch to the next favourite pair")
+    parser.add_argument("--no-reload", action="store_true",
+                        help="only write the files, don't signal running programs")
+    args = parser.parse_args()
+
+    # One run at a time: the popup, Polybar's clicks and the keybind can
+    # overlap, and each reads, changes and writes the state
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with open(LOCK, "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        apply(args)
+
+
+def apply(args):
+    state = theme.load_state()
+    error = update_state(args, state)
+    if error:
+        sys.exit(f"theme-apply: {error}")
+
+    # Render everything before writing anything, so a broken template (render
+    # exits) leaves the state and every file as they were
+    values = theme.palette(state)
+    # Polybar wants the panel's alpha as a hex byte (#AARRGGBB)
+    values["bg_alpha_hex"] = f"{round(float(values['bg_alpha']) * 255):02x}"
+    outputs = [gtk3_theme(values)]  # first: settings.ini below needs its name
+    for target in TARGETS:
+        if (target.needs or target.output.parent).is_dir():
+            text = render(target.template, values)
+            if target.append:
+                text += "\n" + target.append.read_text()
+            if target.output.suffix == ".png":
+                text = rasterise(text)
+            outputs.append((target.output, text))
+
+    theme.save_state(state)
+    for path, data in outputs:
+        write_if_changed(path, data)
+    icon_theme_changed = update_gsettings(values)
+    if not args.no_reload:
+        reload(values)
+        if icon_theme_changed and RESTART_TRAY_APPS.exists():
+            subprocess.run([str(RESTART_TRAY_APPS)], capture_output=True)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # Styled after ~/.config/hypr/hyprlock.conf: blurred screenshot, clock and date top-right,
-# magenta/purple input indicator. Extra args (e.g. --nofork from xss-lock) pass through.
+# input indicator in the theme's pair. Extra args (e.g. --nofork from xss-lock) pass through.
 pgrep -x i3lock >/dev/null && exit 0
 
-font=Monospace
+font="JetBrainsMono Nerd Font"
+# $primary and $secondary follow the theme (written by ~/.config/theme/theme-apply)
+primary=ff00ffee
+secondary=8800ffee
+[ -f ~/.config/i3/lock-colors.sh ] && . ~/.config/i3/lock-colors.sh
 
 # Only i3lock-color (install-i3lock-color.sh) can blur, draw a clock and recolour the indicator.
 if i3lock --version 2>&1 | grep -qi color; then
@@ -15,8 +19,8 @@ if i3lock --version 2>&1 | grep -qi color; then
         --date-str="%A, %d %B %Y" --date-font="$font" --date-size=25 --date-color=ffffffff \
         --date-align=2 --date-pos="x+w-30:y+160" \
         --ind-pos="x+w/2:y+h/2+20" --radius=60 --ring-width=3 \
-        --inside-color=00000000 --ring-color=ff00ffee --line-color=00000000 --separator-color=00000000 \
-        --keyhl-color=8800ffee --bshl-color=ff6633ee \
+        --inside-color=00000000 --ring-color="$primary" --line-color=00000000 --separator-color=00000000 \
+        --keyhl-color="$secondary" --bshl-color=ff6633ee \
         --insidever-color=00000000 --ringver-color=00ff99ee \
         --insidewrong-color=00000000 --ringwrong-color=ff0066ee \
         --verif-text="" --wrong-text="" --noinput-text="" \

@@ -1,4 +1,4 @@
-# i3 config — mirrors ~/.config/hypr/hyprland.conf from jozedash/dotfiles.
+# i3 config — mirrors ~/.config/hypr/hyprland.lua from jozedash/dotfiles.
 
 set $mod Mod4
 
@@ -10,25 +10,35 @@ set $lock exec --no-startup-id ~/.config/i3/scripts/lock.sh
 set $code exec --no-startup-id code
 set $email exec --no-startup-id thunderbird
 set $browser exec --no-startup-id brave-browser
+set $timesheet exec --no-startup-id seamaptimesheetutility
 
 #region Autostart
 exec --no-startup-id xrdb -merge ~/.Xresources
+# Theme first: writes the colour files and sets the GSettings in this session, so
+# the bar and GTK apps start themed. install.sh runs it too, but without a session.
+exec --no-startup-id ~/.config/theme/theme-apply --no-reload
 # dex runs /etc/xdg/autostart entries (nm-applet, blueman, touchegg, ...).
 exec --no-startup-id dex --autostart --environment i3
 # Cinnamon normally provides these; without them GTK theming and sudo/polkit prompts break.
 exec --no-startup-id /usr/libexec/csd-xsettings
 exec --no-startup-id /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1
 exec --no-startup-id gnome-keyring-daemon --start --components=secrets,ssh
-# hypridle timings: lock at 6 min, screen off at 7 min.
+# hypridle timings: lock at 6 min, screen off at 7 min, suspend at 30 min.
+# idle.sh (Polybar's eye icon) switches all three off and back on.
 exec --no-startup-id xset s 360 360 dpms 0 0 420
 exec --no-startup-id xss-lock --transfer-sleep-lock -- ~/.config/i3/scripts/lock.sh --nofork
+exec --no-startup-id xautolock -time 30 -locker 'systemctl suspend' -detectsleep
 exec --no-startup-id dunst
+exec --no-startup-id udiskie
+exec --no-startup-id copyq --start-server
 exec --no-startup-id ~/.config/i3/scripts/touchpad.sh
 exec_always --no-startup-id ~/.config/i3/scripts/wallpaper.sh
 exec_always --no-startup-id sh -c 'pkill -x picom; while pgrep -x picom >/dev/null; do sleep 0.1; done; picom --config ~/.config/picom/picom.conf -b'
 exec_always --no-startup-id ~/.config/polybar/launch.sh
 exec_always --no-startup-id ~/.config/i3/scripts/autotiling.py
 exec --no-startup-id ~/.config/i3/scripts/toggle_layout.sh
+# Re-applies the remembered display layout when monitors are (un)plugged
+exec --no-startup-id ~/.config/i3/scripts/outputs_watch.py
 exec --no-startup-id i3-msg 'workspace number 1'
 #endregion
 
@@ -44,12 +54,9 @@ default_border pixel 1
 default_floating_border pixel 1
 hide_edge_borders none
 
-# class                 border  backgr. text    indicator child_border
-client.focused          #ff00ff #3f3f3f #d8dee9 #8800ff   #ff00ff
-client.focused_inactive #595959 #3f3f3f #d8dee9 #595959   #595959
-client.unfocused        #595959 #3f3f3f #aeaeae #595959   #595959
-client.urgent           #f53c3c #f53c3c #ffffff #f53c3c   #f53c3c
-client.background       #3f3f3f
+# Border colours follow the theme: colors.conf is written by ~/.config/theme/theme-apply.
+# If it's missing, i3's defaults apply.
+include ~/.config/i3/colors.conf
 
 focus_follows_mouse yes
 mouse_warping output
@@ -66,11 +73,14 @@ bindsym $mod+e $email
 bindsym $mod+v floating toggle
 bindsym $mod+r $menu
 bindsym $mod+p exec --no-startup-id ~/.config/i3/scripts/toggle_layout.sh toggle
-bindsym $mod+Shift+p exec --no-startup-id ~/.config/i3/scripts/toggle_layout.sh reset
+bindsym $mod+Shift+p exec --no-startup-id ~/.config/i3/scripts/toggle_layout.sh prev
 # Hyprland's togglesplit; pseudotile has no i3 equivalent so Shift+J toggles tabbed instead.
 bindsym $mod+j layout toggle split
 bindsym $mod+Shift+j layout toggle tabbed split
 bindsym $mod+l $lock
+bindsym $mod+u exec --no-startup-id kitty -e ~/.config/polybar/scripts/upgrade.sh
+bindsym $mod+Shift+u exec --no-startup-id udiskie-umount --all
+bindsym $mod+Shift+t exec --no-startup-id ~/.config/theme/theme-apply --toggle-mode
 
 # i3-only extras on keys Hyprland left free
 bindsym $mod+Shift+f fullscreen toggle
@@ -119,7 +129,8 @@ bindsym $mod+Shift+9 move container to workspace number 9; workspace number 9
 bindsym $mod+Shift+0 move container to workspace number 10; workspace number 10
 
 # Scratchpad stands in for Hyprland's special:magic workspace.
-bindsym $mod+s scratchpad show
+bindsym $mod+s $timesheet
+bindsym $mod+Ctrl+s scratchpad show
 bindsym $mod+Shift+s move scratchpad
 
 bindsym --whole-window $mod+button5 workspace next_on_output
@@ -148,4 +159,6 @@ for_window [window_type="dialog"] floating enable
 for_window [class="Pavucontrol"] floating enable, resize set 800 500, move position center
 for_window [class="Blueman-manager"] floating enable
 for_window [class="Nm-connection-editor"] floating enable
+for_window [class="Theme-popup"] floating enable, border none, sticky enable
+for_window [class="copyq"] floating enable
 #endregion

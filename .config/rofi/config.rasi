@@ -1,19 +1,17 @@
-/* Port of jozedash/dotfiles wofi config + style.css */
+/* Port of jozedash/dotfiles wofi config + base.css. Colours and the icon theme follow
+ * the theme: colors.rasi is written by ~/.config/theme/theme-apply. */
 configuration {
   modi: "drun,run,window";
   show-icons: true;
-  icon-theme: "Mint-Y";
   drun-display-format: "{name}";
   display-drun: "";
   case-sensitive: false;
   font: "JetBrainsMono Nerd Font 11";
 }
 
+@import "colors.rasi"
+
 * {
-  fg: rgb(216, 222, 233);
-  bg: rgba(89, 89, 89, 50%);
-  bg-inner: rgba(63, 63, 63, 80%);
-  accent: rgba(255, 0, 255, 100%);
   background-color: transparent;
   text-color: @fg;
 }
@@ -37,7 +35,7 @@ inputbar {
   children: [entry];
 }
 
-entry { placeholder: "Search..."; placeholder-color: rgba(216, 222, 233, 60%); }
+entry { placeholder: "Search..."; placeholder-color: @fg-dim; }
 
 listview {
   background-color: @bg-inner;
@@ -51,4 +49,4 @@ listview {
 element { padding: 5px; spacing: 10px; border-radius: 5px; border: 1px; border-color: transparent; }
 element-icon { size: 25px; }
 element-text { vertical-align: 0.5; }
-element selected { background-color: rgba(63, 63, 63, 70%); border-color: @fg; }
+element selected { background-color: @bg-selected; border-color: @fg; }
