@@ -138,31 +138,47 @@ move_workspaces() { # one output per workspace, starting from workspace 1
     i3-msg -q "workspace number 1"
 }
 
+# An unplugged output keeps its CRTC (and its share of the screen) until switched
+# off, so this lists active outputs whether they're connected or not
+mapfile -t ACTIVE < <(xrandr --current |
+    awk '$2 ~ /connected$/ && / [0-9]+x[0-9]+\+[0-9]+\+[0-9]+ / {print $1}')
+
+# off_args <output...>: xrandr's arguments to switch off every other active output
+off_args() {
+    local output keep
+    for output in "${ACTIVE[@]}"; do
+        for keep in "$@"; do
+            [ "$output" == "$keep" ] && continue 2
+        done
+        echo "--output $output --off"
+    done
+}
+
 # One xrandr call per layout, so outputs are switched on and off together and
 # there is never a moment with no active output
 case "$LAYOUT" in
     docked)
-        xrandr --output "$MONITOR" $(mode_args "$EXT_MODE") --pos 0x0 --primary --output "$LAPTOP_OUTPUT" --off
+        xrandr --output "$MONITOR" $(mode_args "$EXT_MODE") --pos 0x0 --primary --output "$LAPTOP_OUTPUT" --off \
+            $(off_args "$MONITOR" "$LAPTOP_OUTPUT")
         move_workspaces "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR"
         ;;
     gaming)
         # Lower resolution
-        xrandr --output "$MONITOR" $(mode_args "$GAMING_MODE") --pos 0x0 --primary --output "$LAPTOP_OUTPUT" --off
+        xrandr --output "$MONITOR" $(mode_args "$GAMING_MODE") --pos 0x0 --primary --output "$LAPTOP_OUTPUT" --off \
+            $(off_args "$MONITOR" "$LAPTOP_OUTPUT")
         move_workspaces "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR"
         ;;
     extend)
         # Laptop sits bottom-right of the external monitor
         xrandr --output "$MONITOR" $(mode_args "$EXT_MODE") --pos 0x0 --primary \
             --output "$LAPTOP_OUTPUT" $(mode_args "$LAPTOP_MODE") \
-            --pos "${EXT_W:-1920}x$(( ${EXT_H:-1080} - ${LAPTOP_H:-1080} ))"
+            --pos "${EXT_W:-1920}x$(( ${EXT_H:-1080} - ${LAPTOP_H:-1080} ))" \
+            $(off_args "$MONITOR" "$LAPTOP_OUTPUT")
         move_workspaces "$MONITOR" "$LAPTOP_OUTPUT" "$MONITOR" "$LAPTOP_OUTPUT" "$MONITOR" "$LAPTOP_OUTPUT"
         ;;
     laptop)
-        OFF=()
-        for output in "${EXTERNALS[@]}"; do
-            OFF+=(--output "$output" --off)
-        done
-        xrandr --output "$LAPTOP_OUTPUT" $(mode_args "$LAPTOP_MODE") --pos 0x0 --primary "${OFF[@]}"
+        xrandr --output "$LAPTOP_OUTPUT" $(mode_args "$LAPTOP_MODE") --pos 0x0 --primary \
+            $(off_args "$LAPTOP_OUTPUT")
         ;;
 esac
 
