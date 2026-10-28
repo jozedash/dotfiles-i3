@@ -50,8 +50,8 @@ gaps inner 5
 gaps outer 0
 # Polybar floats over this: 4px offset + 31px bar.
 gaps top 35
-default_border pixel 1
-default_floating_border pixel 1
+default_border pixel 2
+default_floating_border pixel 2
 hide_edge_borders none
 
 # Border colours follow the theme: colors.conf is written by ~/.config/theme/theme-apply.
