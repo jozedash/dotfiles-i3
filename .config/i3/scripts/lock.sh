@@ -4,13 +4,17 @@
 pgrep -x i3lock >/dev/null && exit 0
 
 font="JetBrainsMono Nerd Font"
-# $primary and $secondary follow the theme (written by ~/.config/theme/theme-apply)
+# Indicator colours follow the theme (written by ~/.config/theme/theme-apply); dark defaults.
 primary=ff00ffee
 secondary=8800ffee
+backspace=ffd68aee
+wrong=f53c3cee
+greeter=969696ff
 [ -f ~/.config/i3/lock-colors.sh ] && . ~/.config/i3/lock-colors.sh
 
 # Only i3lock-color (install-i3lock-color.sh) can blur, draw a clock and recolour the indicator.
-if i3lock --version 2>&1 | grep -qi color; then
+# A git build reports a bare commit hash, so also match its maintainer's copyright.
+if i3lock --version 2>&1 | grep -qiE 'color|Raymond Li'; then
     exec i3lock "$@" \
         --blur 8 \
         --clock --force-clock \
@@ -20,12 +24,12 @@ if i3lock --version 2>&1 | grep -qi color; then
         --date-align=2 --date-pos="x+w-30:y+160" \
         --ind-pos="x+w/2:y+h/2+20" --radius=60 --ring-width=3 \
         --inside-color=00000000 --ring-color="$primary" --line-color=00000000 --separator-color=00000000 \
-        --keyhl-color="$secondary" --bshl-color=ff6633ee \
-        --insidever-color=00000000 --ringver-color=00ff99ee \
-        --insidewrong-color=00000000 --ringwrong-color=ff0066ee \
+        --keyhl-color="$secondary" --bshl-color="$backspace" \
+        --insidever-color=00000000 --ringver-color="$secondary" \
+        --insidewrong-color=00000000 --ringwrong-color="$wrong" \
         --verif-text="" --wrong-text="" --noinput-text="" \
         --greeter-text="Input password..." --greeter-font="$font" --greeter-size=16 \
-        --greeter-color=8f8f8fff --greeter-pos="x+w/2:y+h/2+120" \
+        --greeter-color="$greeter" --greeter-pos="x+w/2:y+h/2+120" \
         --pass-media-keys --pass-volume-keys
 fi
 

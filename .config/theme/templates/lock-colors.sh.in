@@ -3,3 +3,6 @@
 # Sourced by ~/.config/i3/scripts/lock.sh; i3lock-color takes RRGGBBAA.
 primary=@primary_hex@ee
 secondary=@secondary_hex@ee
+backspace=@color11_hex@ee
+wrong=@critical_hex@ee
+greeter=@fg_disabled_hex@ff
