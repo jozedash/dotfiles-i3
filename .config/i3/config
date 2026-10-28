@@ -87,8 +87,8 @@ bindsym $mod+Shift+f fullscreen toggle
 bindsym $mod+space focus mode_toggle
 bindsym $mod+a focus parent
 bindsym $mod+Shift+r restart
-bindsym Print exec --no-startup-id gnome-screenshot -a -c
-bindsym $mod+Shift+Print exec --no-startup-id gnome-screenshot -a
+bindsym --release Print exec --no-startup-id gnome-screenshot -a
+bindsym --release $mod+Shift+Print exec --no-startup-id gnome-screenshot -a -c
 
 bindsym $mod+Left focus left
 bindsym $mod+Right focus right
