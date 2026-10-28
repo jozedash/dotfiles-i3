@@ -33,7 +33,7 @@ exec --no-startup-id udiskie
 exec --no-startup-id copyq --start-server
 exec --no-startup-id ~/.config/i3/scripts/touchpad.sh
 exec_always --no-startup-id ~/.config/i3/scripts/wallpaper.sh
-exec_always --no-startup-id sh -c 'pkill -x picom; while pgrep -x picom >/dev/null; do sleep 0.1; done; picom --config ~/.config/picom/picom.conf -b'
+exec_always --no-startup-id ~/.config/i3/scripts/picom.sh
 exec_always --no-startup-id ~/.config/polybar/launch.sh
 exec_always --no-startup-id ~/.config/i3/scripts/autotiling.py
 exec --no-startup-id ~/.config/i3/scripts/toggle_layout.sh
