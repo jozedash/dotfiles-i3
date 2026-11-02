@@ -2,18 +2,22 @@
 #
 # xrandr port of ~/.config/hypr/toggle_layout.sh.
 #
-# Usage: toggle_layout.sh [apply|hotplug|toggle|prev|laptop|docked|extend|gaming]
+# Usage: toggle_layout.sh [apply|hotplug|toggle|prev|laptop|docked|extend]
 #   apply (default) - apply the remembered layout for the currently connected monitors
 #   hotplug         - like apply, but only acts if the set of connected outputs changed
 #   toggle / prev   - cycle forwards / backwards through the layouts
 #   <layout>        - jump straight to that layout
+#
+# extend depends on the monitors connected:
+#   one external  - laptop | monitor (home)
+#   two externals - portrait | landscape | laptop (work)
+# Its alignment and the work monitors' settings are in the block below LAYOUTS.
 #
 # The chosen layout is remembered per monitor setup (keyed on the external monitors'
 # EDIDs), so e.g. the home and office monitors each keep their own layout.
 
 STATEDIR="${XDG_STATE_HOME:-$HOME/.local/state}/i3/layouts"
 RUNDIR="${XDG_RUNTIME_DIR:-/tmp}"
-GAMING_MODE="1600x900"
 # LAPTOP_OUTPUT and LAPTOP_MODE are detected below (eDP/LVDS/DSI output, preferred
 # mode) unless set in this optional machine-specific file
 HOST_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles-host/host.sh"
@@ -21,8 +25,20 @@ HOST_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles-host/host.sh"
 LAPTOP_MODE=${LAPTOP_MODE%@*}  # host.sh may give Hyprland's "WxH@rate"
 
 # Add layouts here, in the order toggle cycles through them
-LAYOUTS=(laptop docked extend gaming)
+LAYOUTS=(laptop docked extend)
 DEFAULT_LAYOUT=extend # Used the first time a new monitor setup is seen
+
+# extend positions: each monitor's top-left corner as XxY in pixels, origin at the
+# top left of the whole desktop and y growing downwards. Nothing may be negative.
+HOME_LAPTOP_POS=0x0            # size 1920x1200
+HOME_MONITOR_POS=1920x0        # size 3840x2160
+WORK_PORTRAIT_POS=0x0          # size 2160x3840 once rotated
+WORK_LANDSCAPE_POS=2160x200   # size 3840x2160
+WORK_LAPTOP_POS=6000x800      # size 1920x1200
+WORK_PORTRAIT_OUTPUT=DP-1-1    # the hub's DP-to-HDMI port, which can't do 4K60
+WORK_PORTRAIT_ROTATION=left    # right if it comes out upside down
+WORK_PORTRAIT_MODE=3840x2160   # 30 Hz on that port; empty for its preferred 1080p60
+WORK_LANDSCAPE_MODE=3840x2160  # empty for its preferred mode
 
 mkdir -p "$STATEDIR"
 
@@ -62,16 +78,25 @@ fi
 if [ -z "$LAPTOP_MODE" ]; then
     LAPTOP_MODE=$(awk -v laptop="$LAPTOP_OUTPUT" '$1 == laptop && $2 != "none" {print $2}' <<< "$OUTPUTS_INFO")
 fi
-LAPTOP_H=$(grep -oP '^\d+x\K\d+' <<< "$LAPTOP_MODE")
 EXTERNALS_INFO=$(awk -v laptop="$LAPTOP_OUTPUT" '$1 != laptop' <<< "$OUTPUTS_INFO")
 
 mapfile -t EXTERNALS < <(awk '{print $1}' <<< "$EXTERNALS_INFO")
 MONITOR=${EXTERNALS[0]}
+PORTRAIT=""
+if [ ${#EXTERNALS[@]} -ge 2 ]; then
+    PORTRAIT=$(awk -v o="$WORK_PORTRAIT_OUTPUT" '$1 == o {print $1; exit}' <<< "$EXTERNALS_INFO")
+    PORTRAIT=${PORTRAIT:-${EXTERNALS[1]}}
+    # The landscape monitor is the main one, so docked uses it too
+    for output in "${EXTERNALS[@]}"; do
+        [ "$output" != "$PORTRAIT" ] && MONITOR=$output && break
+    done
+fi
 SETUP=$(awk '{print $3}' <<< "$EXTERNALS_INFO" | sort | paste -sd+)
 
 # Skip hotplug events that didn't change what's connected, e.g. the ones fired
-# by this script enabling/disabling outputs
-OUTPUTS=$(awk '{print $1}' <<< "$OUTPUTS_INFO" | sort | paste -sd,)
+# by this script enabling/disabling outputs. EDIDs count, so swapping monitors
+# between ports re-applies the layout.
+OUTPUTS=$(awk '{print $1 ":" $3}' <<< "$OUTPUTS_INFO" | sort | paste -sd,)
 if [ "$1" == "hotplug" ] && [ "$OUTPUTS" == "$(cat "$RUNDIR/i3_layout_outputs" 2>/dev/null)" ]; then
     echo "Outputs unchanged ($OUTPUTS), nothing to do"
     exit 0
@@ -103,7 +128,7 @@ else
             LAYOUT=${LAYOUTS[$(( (INDEX + 1) % ${#LAYOUTS[@]} ))]} ;;
         prev)
             LAYOUT=${LAYOUTS[$(( (INDEX - 1 + ${#LAYOUTS[@]}) % ${#LAYOUTS[@]} ))]} ;;
-        laptop|docked|extend|gaming)
+        laptop|docked|extend)
             LAYOUT=$1 ;;
     esac
 
@@ -111,11 +136,9 @@ else
 
     # Use the external monitor's preferred mode rather than assuming 4K
     EXT_MODE=$(awk -v m="$MONITOR" '$1 == m {print $2}' <<< "$EXTERNALS_INFO")
-    EXT_W=$(grep -oP '^\d+(?=x)' <<< "$EXT_MODE")
-    EXT_H=$(grep -oP '^\d+x\K\d+' <<< "$EXT_MODE")
-    if ! xrandr --current | awk -v m="$MONITOR" '/^[^ ]/ {on = ($1 == m)} on {print $1}' |
-        grep -qx "$GAMING_MODE"; then
-        GAMING_MODE=$EXT_MODE
+    [ -n "$PORTRAIT" ] && [ -n "$WORK_LANDSCAPE_MODE" ] && EXT_MODE=$WORK_LANDSCAPE_MODE
+    if [ -n "$PORTRAIT" ]; then
+        PORTRAIT_MODE=${WORK_PORTRAIT_MODE:-$(awk -v m="$PORTRAIT" '$1 == m {print $2}' <<< "$EXTERNALS_INFO")}
     fi
 fi
 echo "Applying layout: $LAYOUT"
@@ -162,19 +185,22 @@ case "$LAYOUT" in
             $(off_args "$MONITOR" "$LAPTOP_OUTPUT")
         move_workspaces "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR"
         ;;
-    gaming)
-        # Lower resolution
-        xrandr --output "$MONITOR" $(mode_args "$GAMING_MODE") --pos 0x0 --primary --output "$LAPTOP_OUTPUT" --off \
-            $(off_args "$MONITOR" "$LAPTOP_OUTPUT")
-        move_workspaces "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR" "$MONITOR"
-        ;;
     extend)
-        # Laptop sits bottom-right of the external monitor
-        xrandr --output "$MONITOR" $(mode_args "$EXT_MODE") --pos 0x0 --primary \
-            --output "$LAPTOP_OUTPUT" $(mode_args "$LAPTOP_MODE") \
-            --pos "${EXT_W:-1920}x$(( ${EXT_H:-1080} - ${LAPTOP_H:-1080} ))" \
-            $(off_args "$MONITOR" "$LAPTOP_OUTPUT")
-        move_workspaces "$MONITOR" "$LAPTOP_OUTPUT" "$MONITOR" "$LAPTOP_OUTPUT" "$MONITOR" "$LAPTOP_OUTPUT"
+        if [ -n "$PORTRAIT" ]; then
+            # Work: portrait | landscape | laptop
+            xrandr --output "$PORTRAIT" $(mode_args "$PORTRAIT_MODE") --rotate "$WORK_PORTRAIT_ROTATION" \
+                --pos "$WORK_PORTRAIT_POS" \
+                --output "$MONITOR" $(mode_args "$EXT_MODE") --rotate normal --primary --pos "$WORK_LANDSCAPE_POS" \
+                --output "$LAPTOP_OUTPUT" $(mode_args "$LAPTOP_MODE") --pos "$WORK_LAPTOP_POS" \
+                $(off_args "$PORTRAIT" "$MONITOR" "$LAPTOP_OUTPUT")
+            move_workspaces "$MONITOR" "$MONITOR" "$MONITOR" "$PORTRAIT" "$LAPTOP_OUTPUT" "$LAPTOP_OUTPUT"
+        else
+            # Home: laptop | monitor
+            xrandr --output "$LAPTOP_OUTPUT" $(mode_args "$LAPTOP_MODE") --pos "$HOME_LAPTOP_POS" \
+                --output "$MONITOR" $(mode_args "$EXT_MODE") --rotate normal --primary --pos "$HOME_MONITOR_POS" \
+                $(off_args "$MONITOR" "$LAPTOP_OUTPUT")
+            move_workspaces "$MONITOR" "$LAPTOP_OUTPUT" "$MONITOR" "$LAPTOP_OUTPUT" "$MONITOR" "$LAPTOP_OUTPUT"
+        fi
         ;;
     laptop)
         xrandr --output "$LAPTOP_OUTPUT" $(mode_args "$LAPTOP_MODE") --pos 0x0 --primary \

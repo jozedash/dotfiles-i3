@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Runs toggle_layout.sh hotplug whenever RandR reports an output change, so
-unplugging in docked/gaming mode falls back to the laptop screen instead of a
+unplugging in docked mode falls back to the laptop screen instead of a
 black screen. Stands in for Hyprland's monitor.added/removed events."""
 import subprocess
 import sys
