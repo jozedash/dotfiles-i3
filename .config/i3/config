@@ -63,7 +63,8 @@ mouse_warping output
 #endregion
 
 #region Keybindings
-bindsym $mod+q $terminal
+# neofetch first, then a shell (kitty's --hold), like fastfetch in jozedash/dotfiles
+bindsym $mod+q exec --no-startup-id sh -c 'command -v kitty >/dev/null && exec kitty --hold -e neofetch || exec gnome-terminal'
 bindsym $mod+b $browser
 bindsym $mod+c kill
 bindsym $mod+Shift+c $code

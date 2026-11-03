@@ -49,8 +49,8 @@ TARGETS = [
     Target("rofi-colors.rasi.in", CONFIG / "rofi/colors.rasi"),
     Target("dunst-colors.conf.in", CONFIG / "dunst/dunstrc.d/colors.conf", needs=CONFIG / "dunst"),
     Target("kitty-colors.conf.in", CONFIG / "kitty/colors.conf"),
-    # fastfetch isn't linked (it has no config of its own); it reads this on every run
-    Target("fastfetch.jsonc.in", CONFIG / "fastfetch/config.jsonc", needs=CONFIG),
+    # neofetch isn't linked (it has no config of its own); it reads this on every run
+    Target("neofetch.conf.in", CONFIG / "neofetch/config.conf", needs=CONFIG),
 ] + [
     Target(f"fcitx5/{name}.in", FCITX5_THEME / name, needs=CONFIG / "fcitx5")
     for name in ("theme.conf", "arrow.svg", "prev.svg", "next.svg", "radio.svg")

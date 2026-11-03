@@ -1,4 +1,5 @@
-/* Port of jozedash/dotfiles wofi config + base.css. Colours and the icon theme follow
+/* Port of jozedash/dotfiles wofi config + base.css, box for box: window > outer-box
+ * (mainbox) > search entry + inner-box (listview). Colours and the icon theme follow
  * the theme: colors.rasi is written by ~/.config/theme/theme-apply. */
 configuration {
   modi: "drun,run,window";
@@ -6,7 +7,8 @@ configuration {
   drun-display-format: "{name}";
   display-drun: "";
   case-sensitive: false;
-  font: "JetBrainsMono Nerd Font 11";
+  /* wofi uses the GTK font */
+  font: "Ubuntu 10";
 }
 
 @import "colors.rasi"
@@ -26,13 +28,31 @@ window {
   padding: 5px;
 }
 
-mainbox { children: [inputbar, listview]; spacing: 5px; }
+/* wofi's outer-box: a second muted layer; its input and inner-box margins make the 10px gap */
+mainbox {
+  children: [inputbar, listview];
+  background-color: @bg-outer;
+  padding: 5px;
+  spacing: 10px;
+}
 
+/* GtkSearchEntry: magnifier on the left, and the GTK theme's always-on focus ring */
 inputbar {
   background-color: @bg-inner;
   padding: 8px;
+  spacing: 8px;
+  border: 1px;
+  border-color: @accent;
   border-radius: 5px;
-  children: [entry];
+  children: [textbox-search, entry];
+}
+
+/* A glyph, not edit-find-symbolic: rofi doesn't recolour symbolic icons */
+textbox-search {
+  expand: false;
+  str: "";
+  font: "Symbols Nerd Font 10";
+  vertical-align: 0.5;
 }
 
 entry { placeholder: "Search..."; placeholder-color: @fg-dim; }
@@ -42,11 +62,19 @@ listview {
   lines: 8;
   dynamic: true;
   scrollbar: false;
+  border: 0; /* rofi's default dashed separator; wofi has none */
   padding: 5px;
-  border-radius: 5px;
 }
 
 element { padding: 5px; spacing: 10px; border-radius: 5px; border: 1px; border-color: transparent; }
 element-icon { size: 25px; }
 element-text { vertical-align: 0.5; }
-element selected { background-color: @bg-selected; border-color: @fg; }
+/* State selectors as specific as rofi's built-in theme's, which would otherwise colour the rows */
+element normal.normal, element alternate.normal, element normal.active, element alternate.active,
+element normal.urgent, element alternate.urgent { background-color: transparent; text-color: @fg; }
+element selected.normal, element selected.active, element selected.urgent {
+  background-color: @bg-selected;
+  text-color: @fg;
+  border-color: @fg;
+}
+element-icon, element-text { background-color: transparent; text-color: inherit; }

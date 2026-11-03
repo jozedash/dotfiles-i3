@@ -8,6 +8,7 @@ configuration {
   fg: @fg@;
   fg-dim: @fg_disabled@;
   bg: #@muted_hex@80;
+  bg-outer: #@muted_hex@4d;
   bg-inner: #@bg_opaque_hex@cc;
   bg-selected: #@bg_opaque_hex@b3;
   accent: @primary@;

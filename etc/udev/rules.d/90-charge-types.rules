@@ -1,0 +1,2 @@
+# Let sudo users switch the conservation charge mode from the polybar battery module
+SUBSYSTEM=="power_supply", KERNEL=="BAT*", RUN+="/usr/bin/chgrp sudo /sys%p/charge_types", RUN+="/usr/bin/chmod g+w /sys%p/charge_types"

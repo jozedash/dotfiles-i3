@@ -8,7 +8,7 @@ repo=$(cd "$(dirname "$0")" && pwd)
 sudo apt-get update
 packages=(
     # Desktop
-    i3 i3lock xss-lock xautolock dex rofi dunst picom polybar feh kitty
+    i3 i3lock xss-lock xautolock dex rofi dunst picom polybar feh kitty neofetch
     brightnessctl playerctl python3-i3ipc python3-xlib fonts-noto-color-emoji
     # Bar modules: drives, clipboard, colour picker, JSON, monitors
     udiskie copyq xclip jq curl htop btop
@@ -63,6 +63,9 @@ sudo cp -rv "$repo/etc/." /etc/
 sudo mkdir -p /etc/security-scan
 (cd "$repo" && find ./usr ./etc -type f | sed 's#^\.##' | sort) | sudo tee /etc/security-scan/expected > /dev/null
 sudo systemctl daemon-reload
+# Applies the udev rules (battery charge mode) to devices already present
+sudo udevadm control --reload
+sudo udevadm trigger --subsystem-match=power_supply
 sudo systemctl enable --now apt-download.timer security-scan.timer
 systemctl --user daemon-reload
 systemctl --user enable --now apt-updates-notify.path security-scan-notify.path

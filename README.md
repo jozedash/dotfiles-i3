@@ -11,7 +11,7 @@ git clone https://github.com/jozedash/dotfiles-i3 ~/dotfiles-i3
 ~/dotfiles-i3/install.sh
 ```
 
-The script installs the packages and JetBrainsMono Nerd Font, then symlinks `i3`, `polybar`, `picom`, `rofi`, `dunst`, `kitty`, `fcitx5`, `fontconfig`, `udiskie`, `theme` and `systemd/user` into `~/.config`. Any existing configs are moved to `*.bak_<date>`. It then renders the theme, switches the input method to fcitx5, copies `usr/` and `etc/` into the system and enables the timers. It also builds [i3lock-color](https://github.com/Raymo111/i3lock-color) into `/usr/local` with `install-i3lock-color.sh`, because Mint doesn't package it. Stock i3lock still works, but the lock screen loses its live clock and coloured indicator. Choose **i3** at the login screen afterwards. Cinnamon stays installed and selectable.
+The script installs the packages and JetBrainsMono Nerd Font, then symlinks `i3`, `polybar`, `picom`, `rofi`, `dunst`, `kitty`, `fcitx5`, `fontconfig`, `udiskie`, `theme` and `systemd/user` into `~/.config`. Any existing configs are moved to `*.bak_<date>`. It then renders the theme, switches the input method to fcitx5, copies `usr/` and `etc/` into the system and enables the timers. It also builds [i3lock-color](https://github.com/Raymo111/i3lock-color) into `/usr/local` with `install-i3lock-color.sh`, because Mint doesn't package it. Stock i3lock still works, but the lock screen loses its live clock and typing feedback. Choose **i3** at the login screen afterwards. Cinnamon stays installed and selectable.
 
 It's safe to run again, e.g. after pulling changes.
 
@@ -33,7 +33,7 @@ It's safe to run again, e.g. after pulling changes.
 
 | Keys | Action |
 |---|---|
-| Super+Q / B / E / Shift+C | Terminal (kitty) / Brave / Thunderbird / VS Code |
+| Super+Q / B / E / Shift+C | Terminal (kitty, opening with neofetch) / Brave / Thunderbird / VS Code |
 | Super+F | File manager (Nemo) |
 | Super+R | App launcher |
 | Super+C | Close window |
@@ -65,7 +65,7 @@ All colours come from one theme: an accent pair (primary + secondary) and a dark
 * From a terminal: `~/.config/theme/theme-apply --pair '#ff00ff' '#8800ff'`, `--mode light`, `--toggle-mode`, ... (`--help` lists them).
 * For plain gradients instead of the photos, set `STYLE=plain` in `.config/i3/scripts/wallpaper.sh`: `Pictures/wallpaper.jpg` in dark mode, its pink-to-white `Pictures/wallpaper-light.jpg` in light.
 
-Everything follows live: i3 borders, i3lock, Polybar, rofi, dunst, fcitx5, kitty, the wallpaper (cherry blossoms at Jiming Temple in light mode, Hongya Cave at night in dark; credits in `.config/i3/wallpapers/CREDITS.md`), GTK apps (Nemo, file pickers), libadwaita apps, Firefox and Brave (dark/light) and the Papirus icons (dark/light).
+Everything follows live: i3 borders, i3lock, Polybar, rofi, dunst, fcitx5, kitty, neofetch, the wallpaper (cherry blossoms at Jiming Temple in light mode, Hongya Cave at night in dark; credits in `.config/i3/wallpapers/CREDITS.md`), GTK apps (Nemo, file pickers), libadwaita apps, Firefox and Brave (dark/light) and the Papirus icons (dark/light).
 
 The GTK and icon themes are set in Cinnamon's GSettings, which its xsettings daemon (started by the i3 config) serves to running apps. Cinnamon reads the same settings, so it follows the theme too.
 
@@ -79,12 +79,22 @@ How it works: the choice is saved in `~/.local/state/dotfiles-theme/state.json`.
 | Memory / CPU / temperature | htop / htop / btop | |
 | Updates (count; restart icon when a reboot is needed; shield when only config files need merging) | Install them | |
 | USB drives mounted by udiskie | Open in Nemo | Unmount all |
-| Notifications | Show the last one again | Do not disturb |
+| Notifications | Pick one from the history (rofi) to show again | Do not disturb |
 | Clipboard | CopyQ history menu | |
 | Eye | Stay awake (no lock, blanking or suspend) | |
 | Colour picker (swatch of the last colour) | Pick and copy a colour | |
 | Palette | Theme picker | Next favourite (middle: dark/light) |
 | Bluetooth | Blueman | |
+| Volume | pavucontrol (scroll: ±1%) | |
+| Brightness | (scroll: ±5%) | |
+| Network | nmtui | |
+| Battery | Toggle conservation charging (Long_Life, or Custom on Dell) | |
+
+Toggling the battery's charge mode needs `etc/udev/rules.d/90-charge-types.rules`, which `install.sh` copies; it lets the `sudo` group write `charge_types`.
+
+## Lock screen
+
+After hyprlock: a blurred screenshot, the clock and date top-right, the Linux Mint logo bottom-left and a password ring below the centre. The ring is the theme's primary, filled with the mode's background; each key flashes part of it in the secondary. It turns green while checking and red on a wrong password. `.config/i3/scripts/lock_overlay.py` draws the logo (read from the `mint-artwork` icon) for each monitor, cached in `$XDG_RUNTIME_DIR` per layout and theme.
 
 ## Idle
 
