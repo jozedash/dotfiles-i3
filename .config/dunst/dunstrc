@@ -1,0 +1,23 @@
+# Colours follow the theme: dunstrc.d/colors.conf is written by ~/.config/theme/theme-apply.
+[global]
+    font = JetBrainsMono Nerd Font 10
+    origin = top-right
+    offset = (10, 45)
+    width = 350
+    corner_radius = 10
+    frame_width = 2
+    separator_color = frame
+    gap_size = 5
+    padding = 10
+    horizontal_padding = 12
+    icon_position = left
+    max_icon_size = 48
+
+[urgency_low]
+    timeout = 5
+
+[urgency_normal]
+    timeout = 8
+
+[urgency_critical]
+    timeout = 0

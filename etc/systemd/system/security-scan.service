@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly security scan (firewall, ports, security updates, altered files, rkhunter)
+Documentation=file:///usr/local/bin/security-scan
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/security-scan
+Nice=19
+IOSchedulingClass=idle

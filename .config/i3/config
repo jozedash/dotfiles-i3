@@ -1,0 +1,165 @@
+# i3 config — mirrors ~/.config/hypr/hyprland.lua from jozedash/dotfiles.
+
+set $mod Mod4
+
+# Programs (terminal falls back to gnome-terminal if kitty is missing)
+set $terminal exec --no-startup-id sh -c 'command -v kitty >/dev/null && exec kitty || exec gnome-terminal'
+set $fileManager exec --no-startup-id nemo
+set $menu exec --no-startup-id rofi -show drun
+set $lock exec --no-startup-id ~/.config/i3/scripts/lock.sh
+set $code exec --no-startup-id code
+set $email exec --no-startup-id thunderbird
+set $browser exec --no-startup-id brave-browser
+set $timesheet exec --no-startup-id seamaptimesheetutility
+
+#region Autostart
+exec --no-startup-id xrdb -merge ~/.Xresources
+# Theme first: writes the colour files and sets the GSettings in this session, so
+# the bar and GTK apps start themed. install.sh runs it too, but without a session.
+exec --no-startup-id ~/.config/theme/theme-apply --no-reload
+# dex runs /etc/xdg/autostart entries (nm-applet, blueman, touchegg, ...).
+exec --no-startup-id dex --autostart --environment i3
+# Cinnamon normally provides these; without them GTK theming and sudo/polkit prompts break.
+exec --no-startup-id /usr/libexec/csd-xsettings
+exec --no-startup-id /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1
+exec --no-startup-id gnome-keyring-daemon --start --components=secrets,ssh
+# Lock at 10 min idle, screen off 10 min after locking, suspend at 30 min idle.
+# idle.sh (Polybar's eye icon) holds the lock and screen-off timings and switches all three off and back on.
+exec --no-startup-id ~/.config/polybar/scripts/idle.sh apply
+exec --no-startup-id xss-lock --transfer-sleep-lock -- ~/.config/i3/scripts/lock.sh
+exec --no-startup-id xautolock -time 30 -locker 'systemctl suspend' -detectsleep
+exec --no-startup-id dunst
+exec --no-startup-id udiskie
+exec --no-startup-id copyq --start-server
+exec --no-startup-id ~/.config/i3/scripts/touchpad.sh
+exec_always --no-startup-id ~/.config/i3/scripts/wallpaper.sh
+exec_always --no-startup-id ~/.config/i3/scripts/picom.sh
+exec_always --no-startup-id ~/.config/polybar/launch.sh
+exec_always --no-startup-id ~/.config/i3/scripts/autotiling.py
+exec --no-startup-id ~/.config/i3/scripts/toggle_layout.sh
+# Re-applies the remembered display layout when monitors are (un)plugged
+exec --no-startup-id ~/.config/i3/scripts/outputs_watch.py
+exec --no-startup-id i3-msg 'workspace number 1'
+#endregion
+
+#region Look and feel
+font pango:JetBrainsMono Nerd Font 10
+
+# Hyprland gaps_in 2.5 (per side) = 5px between windows; i3 adds outer to inner at screen edges.
+gaps inner 5
+gaps outer 0
+# Polybar floats over this: 4px offset + 31px bar.
+gaps top 35
+default_border pixel 2
+default_floating_border pixel 2
+hide_edge_borders none
+
+# Border colours follow the theme: colors.conf is written by ~/.config/theme/theme-apply.
+# If it's missing, i3's defaults apply.
+include ~/.config/i3/colors.conf
+
+focus_follows_mouse yes
+mouse_warping output
+#endregion
+
+#region Keybindings
+# neofetch first, then a shell (kitty's --hold), like fastfetch in jozedash/dotfiles
+bindsym $mod+q exec --no-startup-id sh -c 'command -v kitty >/dev/null && exec kitty --hold -e neofetch || exec gnome-terminal'
+bindsym $mod+b $browser
+bindsym $mod+c kill
+bindsym $mod+Shift+c $code
+bindsym $mod+m exit
+bindsym $mod+f $fileManager
+bindsym $mod+e $email
+bindsym $mod+v floating toggle
+bindsym $mod+r $menu
+bindsym $mod+p exec --no-startup-id ~/.config/i3/scripts/toggle_layout.sh toggle
+bindsym $mod+Shift+p exec --no-startup-id ~/.config/i3/scripts/toggle_layout.sh prev
+# Hyprland's togglesplit; pseudotile has no i3 equivalent so Shift+J toggles tabbed instead.
+bindsym $mod+j layout toggle split
+bindsym $mod+Shift+j layout toggle tabbed split
+bindsym $mod+l $lock
+bindsym $mod+u exec --no-startup-id kitty -e ~/.config/polybar/scripts/upgrade.sh
+bindsym $mod+Shift+u exec --no-startup-id udiskie-umount --all
+bindsym $mod+Shift+t exec --no-startup-id ~/.config/theme/theme-apply --toggle-mode
+
+# i3-only extras on keys Hyprland left free
+bindsym $mod+Shift+f fullscreen toggle
+bindsym $mod+space focus mode_toggle
+bindsym $mod+a focus parent
+bindsym $mod+Shift+r restart
+bindsym --release Print exec --no-startup-id gnome-screenshot -a
+bindsym --release $mod+Shift+Print exec --no-startup-id gnome-screenshot -a -c
+
+bindsym $mod+Left focus left
+bindsym $mod+Right focus right
+bindsym $mod+Up focus up
+bindsym $mod+Down focus down
+
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Right move right
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Down move down
+
+bindsym $mod+Ctrl+Left resize shrink width 5 px or 5 ppt
+bindsym $mod+Ctrl+Right resize grow width 5 px or 5 ppt
+bindsym $mod+Ctrl+Up resize shrink height 5 px or 5 ppt
+bindsym $mod+Ctrl+Down resize grow height 5 px or 5 ppt
+
+bindsym $mod+1 workspace number 1
+bindsym $mod+2 workspace number 2
+bindsym $mod+3 workspace number 3
+bindsym $mod+4 workspace number 4
+bindsym $mod+5 workspace number 5
+bindsym $mod+6 workspace number 6
+bindsym $mod+7 workspace number 7
+bindsym $mod+8 workspace number 8
+bindsym $mod+9 workspace number 9
+bindsym $mod+0 workspace number 10
+
+# Hyprland's movetoworkspace follows the window, so do the same here.
+bindsym $mod+Shift+1 move container to workspace number 1; workspace number 1
+bindsym $mod+Shift+2 move container to workspace number 2; workspace number 2
+bindsym $mod+Shift+3 move container to workspace number 3; workspace number 3
+bindsym $mod+Shift+4 move container to workspace number 4; workspace number 4
+bindsym $mod+Shift+5 move container to workspace number 5; workspace number 5
+bindsym $mod+Shift+6 move container to workspace number 6; workspace number 6
+bindsym $mod+Shift+7 move container to workspace number 7; workspace number 7
+bindsym $mod+Shift+8 move container to workspace number 8; workspace number 8
+bindsym $mod+Shift+9 move container to workspace number 9; workspace number 9
+bindsym $mod+Shift+0 move container to workspace number 10; workspace number 10
+
+# Scratchpad stands in for Hyprland's special:magic workspace.
+bindsym $mod+s $timesheet
+bindsym $mod+Ctrl+s scratchpad show
+bindsym $mod+Shift+s move scratchpad
+
+bindsym --whole-window $mod+button5 workspace next_on_output
+bindsym --whole-window $mod+button4 workspace prev_on_output
+
+# Super+LMB drags, Super+RMB resizes (floating); Super+LMB on tiled windows swaps position.
+floating_modifier $mod
+tiling_drag modifier titlebar
+
+bindsym XF86AudioRaiseVolume exec --no-startup-id wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+
+bindsym XF86AudioLowerVolume exec --no-startup-id wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+bindsym XF86AudioMute exec --no-startup-id wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+bindsym XF86AudioMicMute exec --no-startup-id wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle
+bindsym XF86MonBrightnessUp exec --no-startup-id brightnessctl -e4 -n2 set 5%+
+bindsym XF86MonBrightnessDown exec --no-startup-id brightnessctl -e4 -n2 set 5%-
+bindsym XF86AudioNext exec --no-startup-id playerctl next
+bindsym XF86AudioPause exec --no-startup-id playerctl play-pause
+bindsym XF86AudioPlay exec --no-startup-id playerctl play-pause
+bindsym XF86AudioPrev exec --no-startup-id playerctl previous
+#endregion
+
+#region Window rules
+for_window [window_role="pop-up"] floating enable
+for_window [window_role="dialog"] floating enable
+for_window [window_type="dialog"] floating enable
+for_window [class="Pavucontrol"] floating enable, resize set 800 500, move position center
+for_window [class="Blueman-manager"] floating enable
+for_window [class="Nm-connection-editor"] floating enable
+for_window [class="Theme-popup"] floating enable, border none, sticky enable
+for_window [class="copyq"] floating enable
+#endregion

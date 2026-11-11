@@ -1,0 +1,11 @@
+# udiskie: automount USB drives under /media/$USER/<label>.
+# Super+Shift+U unmounts everything (i3 config).
+program_options:
+  automount: true
+  notify: true
+  # No tray icon: Polybar's usb module shows mounted drives instead,
+  # refreshed by this hook on every udiskie event
+  tray: false
+  # The delay lets udisks finish cleaning up a mount when a drive is pulled out
+  event_hook: sh -c 'sleep 1; polybar-msg action usb hook 0'
+  file_manager: nemo

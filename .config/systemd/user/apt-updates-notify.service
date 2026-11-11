@@ -1,0 +1,6 @@
+[Unit]
+Description=Notify about updates downloaded by apt-download.timer
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/systemd/user/apt-updates-notify.sh
